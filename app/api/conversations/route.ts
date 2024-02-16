@@ -1,24 +1,24 @@
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
+import { pusherServer } from "@/app/libs/pusher";
 
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser();
     const body = await request.json();
-    console.log("🚀 ~ POST ~ body:", body)
     const { userId, isGroup, members, name } = body;
 
     if (!currentUser?.id || !currentUser?.email) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    if (isGroup && ((!members || members.length < 2) || !name)) {
+    if (isGroup && (!members || members.length < 2 || !name)) {
       return new NextResponse("Invalid data", { status: 400 });
     }
 
     if (isGroup) {
-      const newConversations = await prisma.conversation.create({
+      const newConversation = await prisma.conversation.create({
         data: {
           name,
           isGroup,
@@ -37,7 +37,14 @@ export async function POST(request: Request) {
           users: true,
         },
       });
-      return NextResponse.json(newConversations);
+
+      newConversation.users.forEach((user) => {
+        if (user.email) {
+          pusherServer.trigger(user.email, "conversation:new", newConversation);
+        }
+      });
+
+      return NextResponse.json(newConversation);
     }
 
     const existingConversations = await prisma.conversation.findMany({
@@ -62,22 +69,28 @@ export async function POST(request: Request) {
     if (singleConversation) return NextResponse.json(singleConversation);
 
     const newConversations = await prisma.conversation.create({
-        data: {
-            users: {
-                connect: [
-                    {
-                        id: currentUser.id,
-                    },
-                    {
-                        id: userId,
-                    },
-                ],
-            }
+      data: {
+        users: {
+          connect: [
+            {
+              id: currentUser.id,
+            },
+            {
+              id: userId,
+            },
+          ],
         },
-        include: {
-            users: true,
-        },
-    })
+      },
+      include: {
+        users: true,
+      },
+    });
+
+    newConversations.users.map((user) => {
+      if (user.email) {
+        pusherServer.trigger(user.email, "conversation:new", newConversations);
+      }
+    });
 
     return NextResponse.json(newConversations);
   } catch (error: any) {

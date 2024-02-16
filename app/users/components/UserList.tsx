@@ -28,7 +28,7 @@ const UserList: React.FC<UserListProps> = ({ items }) => {
     left-0
     "
     >
-      <div className="xl:px-8">
+      <div className="px-8">
         <div className="flex-col">
           <div className="text-2xl font-bold text-neutral-800 py-4">People</div>
         </div>
