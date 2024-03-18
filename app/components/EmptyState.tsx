@@ -9,6 +9,7 @@ const EmptyState = () => {
     sm:px-6
     lg:px-8
     h-full
+    w-full
     flex
     justify-center
     items-center
